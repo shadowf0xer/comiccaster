@@ -1,0 +1,42 @@
+name: Castlori feed Linux review
+
+on:
+  push:
+    branches: [castlori-feed-linux-review]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Offline suite on Linux (${{ matrix.tree }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tree: upstream base
+            revision: a28c4b7afefbc5d0fbdd229d04cb7a51483bef71
+          - tree: Castlori candidate
+            revision: d303dca0f2b0f3cd05df9e03768e1878a05e1f50
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.revision }}
+          persist-credentials: false
+      - name: Verify checked out revision
+        env:
+          EXPECTED_REVISION: ${{ matrix.revision }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_REVISION"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install upstream pinned dependencies
+        run: |
+          python -m pip install -r requirements.txt -c constraints.txt
+          python -m pip install -e ".[dev]" -c constraints.txt
+      - name: Run offline test suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -o addopts= -q --tb=no -rfE -m 'not network and not integration'
